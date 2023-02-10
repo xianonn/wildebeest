@@ -17,7 +17,7 @@ export default component$((props: Props) => {
 	const status = props.status.reblog ?? props.status
 	const reblogger = props.status.reblog && props.status.account
 
-	const accountUrl = `/@${status.account.username}`
+	const accountUrl = useAccountUrl(status.account)
 	const statusUrl = `${accountUrl}/${status.id}`
 
 	const handleContentClick = $(() => nav(statusUrl))
