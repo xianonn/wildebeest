@@ -10,7 +10,6 @@ export type Env = {
 	DATABASE: Database
 	DOMAIN: string
 	ADMIN_EMAIL: string
-	DO_CACHE: DurableObjectNamespace
 
 	SENTRY_DSN: string
 	SENTRY_ACCESS_CLIENT_ID: string

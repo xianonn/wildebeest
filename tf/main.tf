@@ -27,11 +27,6 @@ variable "d1_id" {
   sensitive = true
 }
 
-variable "do_cache_id" {
-  type = string
-  sensitive = true
-}
-
 variable "access_auth_domain" {
   type = string
   sensitive = true
@@ -131,10 +126,6 @@ resource "cloudflare_pages_project" "wildebeest_pages_project" {
 
       d1_databases = {
         DATABASE = sensitive(var.d1_id)
-      }
-
-      durable_object_namespaces = {
-        DO_CACHE = sensitive(var.do_cache_id)
       }
 
       compatibility_date = "2023-01-09"

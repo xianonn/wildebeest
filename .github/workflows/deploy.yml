@@ -52,39 +52,6 @@ jobs:
         with:
           node-version: 18
 
-      - name: Configure Cloudflare Images variants
-        run: |
-          curl -XPOST https://api.cloudflare.com/client/v4/accounts/${{ secrets.CF_ACCOUNT_ID }}/images/v1/variants \
-              -d '{
-                  "id": "avatar",
-                  "options": {
-                      "metadata": "copyright",
-                      "width": 400,
-                      "height": 400
-                  }
-              }' \
-              -H 'Authorization: Bearer ${{ secrets.CF_API_TOKEN }}'
-
-          curl -XPOST https://api.cloudflare.com/client/v4/accounts/${{ secrets.CF_ACCOUNT_ID }}/images/v1/variants \
-              -d '{
-                  "id": "header",
-                  "options": {
-                      "metadata": "copyright",
-                      "width": 1500,
-                      "height": 500
-                  }
-              }' \
-              -H 'Authorization: Bearer ${{ secrets.CF_API_TOKEN }}'
-
-          curl -XPOST https://api.cloudflare.com/client/v4/accounts/${{ secrets.CF_ACCOUNT_ID }}/images/v1/variants \
-              -d '{
-                  "id": "usercontent",
-                  "options": {
-                      "metadata": "copyright"
-                  }
-              }' \
-              -H 'Authorization: Bearer ${{ secrets.CF_API_TOKEN }}'
-
       - name: Create D1 database
         uses: cloudflare/wrangler-action@2.0.0
         with:
@@ -177,20 +144,6 @@ jobs:
             echo "VAPID keys generated"
           fi
 
-      - name: Publish DO
-        uses: cloudflare/wrangler-action@2.0.0
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          command: publish --config do/wrangler.toml
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-
-      - name: Retrieve DO namespace
-        run: |
-          curl https://api.cloudflare.com/client/v4/accounts/${{ secrets.CF_ACCOUNT_ID }}/workers/durable_objects/namespaces \
-              -H 'Authorization: Bearer ${{ secrets.CF_API_TOKEN }}' \
-              | jq -r '.result[] | select( .script == "wildebeest-do" ) | .id' | awk '{print "do_cache_id="$1}' >> $GITHUB_ENV
-
       - name: Configure
         run: terraform plan && terraform apply -auto-approve
         working-directory: ./tf
@@ -201,7 +154,6 @@ jobs:
           TF_VAR_cloudflare_deploy_domain: ${{ vars.CF_DEPLOY_DOMAIN }}
           TF_VAR_name_suffix: ${{ env.NAME_SUFFIX }}
           TF_VAR_d1_id: ${{ env.d1_id }}
-          TF_VAR_do_cache_id: ${{ env.do_cache_id }}
           TF_VAR_access_auth_domain: ${{ env.auth_domain }}
           TF_VAR_wd_instance_title: ${{ vars.INSTANCE_TITLE }}
           TF_VAR_wd_admin_email: ${{ vars.ADMIN_EMAIL }}
@@ -239,15 +191,6 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
 
-      - name: Create Queue
-        uses: cloudflare/wrangler-action@2.0.0
-        with:
-          command: queues create wildebeest-${{ env.NAME_SUFFIX }}
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-        continue-on-error: true
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-
       - name: Publish consumer
         uses: cloudflare/wrangler-action@2.0.0
         with:
@@ -256,18 +199,7 @@ jobs:
             echo "*** pre commands ***"
             echo -e "name = \"wildebeest-consumer-${{ env.NAME_SUFFIX }}\"\n" >> consumer/wrangler.toml
 
-            echo -e "[[queues.consumers]]\n" >> consumer/wrangler.toml
-            echo -e "max_batch_size = 10\n" >> consumer/wrangler.toml
-            echo -e "max_batch_timeout = 30\n" >> consumer/wrangler.toml
-            echo -e "max_retries = 10\n" >> consumer/wrangler.toml
-            echo -e "queue = \"wildebeest-${{ env.NAME_SUFFIX }}\"\n" >> consumer/wrangler.toml
-
             echo -e "[[d1_databases]]\nbinding=\"DATABASE\"\ndatabase_name=\"wildebeest-${{ env.NAME_SUFFIX }}\"\ndatabase_id=\"${{ env.d1_id }}\"\n" >> consumer/wrangler.toml
-
-            echo -e "[durable_objects]\n" >> consumer/wrangler.toml
-            echo -e "bindings=[" >> consumer/wrangler.toml
-            echo -e "{name=\"DO_CACHE\",class_name=\"WildebeestCache\",script_name=\"wildebeest-do\"}," >> consumer/wrangler.toml
-            echo -e "]" >> consumer/wrangler.toml
 
             echo -e "[vars]\n" >> consumer/wrangler.toml
             echo -e "DOMAIN=\"${{ vars.CF_DEPLOY_DOMAIN }}\"\n" >> consumer/wrangler.toml
@@ -279,23 +211,6 @@ jobs:
           command: publish --config consumer/wrangler.toml
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-
-      - name: add Queue producer to Pages
-        run: |
-          curl https://api.cloudflare.com/client/v4/accounts/${{ secrets.CF_ACCOUNT_ID }}/pages/projects/wildebeest-${{ env.NAME_SUFFIX }} \
-              -XPATCH \
-              -H 'Authorization: Bearer ${{ secrets.CF_API_TOKEN }}' \
-              -d  '{
-                  "deployment_configs": {
-                    "production": {
-                      "queue_producers": {
-                        "QUEUE": {
-                          "name": "wildebeest-${{ env.NAME_SUFFIX }}"
-                        }
-                      }
-                    }
-                  }
-                }' > /dev/null
 
       - name: Publish
         uses: cloudflare/wrangler-action@2.0.0

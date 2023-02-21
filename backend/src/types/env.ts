@@ -6,7 +6,6 @@ export interface Env {
 	// FIXME: shouldn't it be USER_KEY?
 	userKEK: string
 	QUEUE: Queue<MessageBody>
-	DO_CACHE: DurableObjectNamespace
 
 	CF_ACCOUNT_ID: string
 	CF_API_TOKEN: string
